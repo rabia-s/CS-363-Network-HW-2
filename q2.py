@@ -1,68 +1,67 @@
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Function to generate and analyze Erdős-Rényi networks
-def generate_er_network(n, p, runs=30):
-    degrees = []
-    clustering_coeffs = []
-    path_lengths = []
-
-    for _ in range(runs):
+# Function to generate an E-R network and calculate properties
+def erdos_renyi_network(n, p, repetitions=30):
+    avg_degrees = []
+    avg_clustering_coeffs = []
+    avg_path_lengths = []
+    degree_distributions = []
+    
+    for _ in range(repetitions):
+        # Generate the E-R graph
         G = nx.erdos_renyi_graph(n, p)
-
-        # Average degree
-        avg_degree = sum(dict(G.degree()).values()) / n
-        degrees.append(avg_degree)
-
-        # Average clustering coefficient
-        clustering_coeff = nx.average_clustering(G)
-        clustering_coeffs.append(clustering_coeff)
-
-        # Average path length (only if the graph is connected)
+        
+        # Degree-related metrics
+        degrees = [deg for _, deg in G.degree()]
+        avg_degrees.append(np.mean(degrees))
+        degree_distributions.extend(degrees)
+        
+        # Calculate properties if the graph is connected
         if nx.is_connected(G):
-            path_length = nx.average_shortest_path_length(G)
-            path_lengths.append(path_length)
+            avg_path_lengths.append(nx.average_shortest_path_length(G))
         else:
-            path_lengths.append(float('inf'))
+            avg_path_lengths.append(float('inf'))  # Mark graphs that aren't connected
+            
+        avg_clustering_coeffs.append(nx.average_clustering(G))
+    
+    # Aggregate results
+    return {
+        "avg_degree": np.mean(avg_degrees),
+        "avg_clustering_coeff": np.mean(avg_clustering_coeffs),
+        "avg_path_length": np.mean([x for x in avg_path_lengths if x != float('inf')]),  # Exclude infinite cases
+        "degree_distribution": degree_distributions
+    }
 
-    avg_degree = np.mean(degrees)
-    avg_clustering = np.mean(clustering_coeffs)
-    avg_path_length = np.mean([x for x in path_lengths if x != float('inf')])
-
-    # Degree distribution
-    degree_sequence = [d for n, d in G.degree()]
-    degree_counts = np.bincount(degree_sequence)
-    degrees = np.arange(len(degree_counts))
-
-    plt.figure(figsize=(8, 5))
-    plt.bar(degrees, degree_counts / sum(degree_counts), width=0.8, color='steelblue')
-    plt.title(f"Degree Distribution (n={n}, p={p})")
+# Plot function for degree distribution
+def plot_degree_distribution(degree_distributions, n, p):
+    sns.histplot(degree_distributions, kde=True, bins=30, color="blue", alpha=0.7)
+    plt.title(f"Degree Distribution\n(n={n}, p={p})")
     plt.xlabel("Degree")
     plt.ylabel("Frequency")
     plt.show()
 
-    return avg_degree, avg_clustering, avg_path_length
-
-# Test configurations
+# Input configurations (n, p)
 configs = [
-    (7 * 10**6, 10**-2),
-    (1000, 0.01),
-    (5000, 0.002)
+    (100, 0.1),
+    (1000, 0.01),       # Small network
+    # (10000, 0.005),     # Medium network
+    # (7 * 10**6, 0.01),  # Large network
 ]
 
-results = {}
-
+# Run experiments for each configuration
+results = []
 for n, p in configs:
-    print(f"Running configuration: n={n}, p={p}")
-    avg_degree, avg_clustering, avg_path_length = generate_er_network(n, p)
-    results[(n, p)] = (avg_degree, avg_clustering, avg_path_length)
-
-# Report results
-for (n, p), (avg_degree, avg_clustering, avg_path_length) in results.items():
-    print(f"\nConfiguration: n={n}, p={p}")
-    print(f"Average Degree: {avg_degree:.4f} (Expected: {n * p:.4f})")
-    print(f"Average Clustering Coefficient: {avg_clustering:.4f} (Expected: {p:.4f})")
-    if avg_path_length:
-        expected_path_length = np.log(n) / (n * p)
-        print(f"Average Path Length: {avg_path_length:.4f} (Expected: {expected_path_length:.4f})")
+    result = erdos_renyi_network(n, p)
+    results.append((n, p, result))
+    
+    # Print results
+    print(f"Configuration (n={n}, p={p}):")
+    print(f" - Average degree: {result['avg_degree']}")
+    print(f" - Average clustering coefficient: {result['avg_clustering_coeff']}")
+    print(f" - Average path length: {result['avg_path_length']}")
+    
+    # Make plots
+    plot_degree_distribution(result['degree_distribution'], n, p)
